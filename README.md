@@ -1,5 +1,5 @@
-# cvt_timing_calculator_12
-CVT (Coordinated Video Timings) timing calculator with CVT v1.2 timings.
+# cvt_modeline_calculator_12
+CVT (Coordinated Video Timings) modeline calculator with CVT v1.2 timings.
 
 This is a modified CVT calculator based on [cvt](http://www.uruk.org/~erich/projects/cvt/)  
 by erich@uruk.org, which is based on [GTF modeline calculator](http://gtf.sourceforge.net/) by Andy Ritger.
