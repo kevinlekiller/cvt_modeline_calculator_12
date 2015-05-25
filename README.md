@@ -22,6 +22,6 @@ Download:
 
 Compilation:
 
-`$ gcc cvt12.c -O2 -o cvt -lm -Wall`
+`$ gcc cvt12.c -O2 -o cvt12 -lm -Wall`
 
 License is in the source at the top.
