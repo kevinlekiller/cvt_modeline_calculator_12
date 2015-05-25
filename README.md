@@ -16,4 +16,8 @@ Changes:
  * Fix some default timing values on v1.1 to be in line with the Vesa Public Standards CVT Generator.
  * Various minor changes.
 
+Compilation:
+
+`$ gcc cvt12.c -O2 -o cvt -lm -Wall`
+
 License is in the source at the top.
