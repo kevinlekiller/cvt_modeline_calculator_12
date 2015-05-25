@@ -16,6 +16,10 @@ Changes:
  * Fix some default timing values on v1.1 to be in line with the Vesa Public Standards CVT Generator.
  * Various minor changes.
 
+Download:
+
+`$ curl https://raw.githubusercontent.com/kevinlekiller/cvt_modeline_calculator_12/master/cvt12.c --output cvt12.c`
+
 Compilation:
 
 `$ gcc cvt12.c -O2 -o cvt -lm -Wall`
