@@ -1,6 +1,6 @@
 /* cvt12.c  Generate mode timings using the CVT v1.2 or CVT v1.1 Timing Standards.
  *
- * gcc cvt12.c -O2 -o cvt -lm -Wall
+ * gcc cvt12.c -O2 -o cvt12 -lm -Wall
  *
  * This is a modification of cvt.c on May 25, 2015 at https://github.com/kevinlekiller/cvt_timing_calculator_12
  *
