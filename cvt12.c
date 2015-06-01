@@ -108,8 +108,8 @@ float   RB_V_FPORCH     =   3.000; // lines
 #define RB_H_SYNC          32.000  // pixels
 #define RB_H_BLANK        160.000  // pixels
 // C' and M' are part of the Blanking Duty Cycle computation.
-float   C_PRIME         =   0.000;
-float   M_PRIME         =   0.000;
+#define C_PRIME           (((C - J) * K/256.0) + J)
+#define M_PRIME           (M * K / 256.0)
 
 // Struct definitions.
 typedef struct __mode {
@@ -763,8 +763,6 @@ int main (int argc, char *argv[])
     if (o->reduced_blank_v1_2 == 1) {
         set_global_timings_v1_2();
     }
-    C_PRIME = (((C - J) * K/256.0) + J);
-    M_PRIME = (M * K / 256.0);
 
     m = vert_refresh (o->x, o->y, o->v_freq, o->interlaced, o->reduced_blank, 0, o->film_optimized);
     if (!m) {
