@@ -34,11 +34,11 @@
  *
  * Copyright (c) 2001, Andy Ritger  aritger@nvidia.com
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  * o Redistributions of source code must retain the above copyright
  *   notice, this list of conditions and the following disclaimer.
  * o Redistributions in binary form must reproduce the above copyright
@@ -90,7 +90,6 @@
 float   CLOCK_STEP      =   0.250; // Clock steps in MHz
 #define MARGIN_PERCENT      1.800  // % of active vertical image
 #define H_SYNC_PER          8.000  // sync % of horizontal image
-float   CELL_GRAN       =   8.000; // assumed character cell granularity
 float   CELL_GRAN_RND   =   8.000; // assumed character cell granularity (round)
 float   MIN_V_BPORCH    =   6.000; // width of vsync in lines
 #define MIN_V_PORCH_RND     3.000  // width of vsync in lines
@@ -100,13 +99,12 @@ float   MIN_V_BPORCH    =   6.000; // width of vsync in lines
 #define J                  20.000  // blanking formula scaling factor
 // Standard Timing Parameters
 #define MIN_VSYNC_BP      550.000  // min time of vsync + back porch (us)
-#define H_SYNC_PERCENT      8.000  // width of hsync as % of total line
 // Reduced Blanking defines
 #define RB_MIN_V_BPORCH     6.000  // lines
 float   RB_V_FPORCH     =   3.000; // lines
 #define RB_MIN_V_BLANK    460.000  // us
 #define RB_H_SYNC          32.000  // pixels
-#define RB_H_BLANK        160.000  // pixels
+float   RB_H_BLANK      = 160.000; // pixels
 // C' and M' are part of the Blanking Duty Cycle computation.
 #define C_PRIME           (((C - J) * K/256.0) + J)
 #define M_PRIME           (M * K / 256.0)
@@ -122,7 +120,7 @@ typedef struct __mode {
 
 typedef struct __options {
     int x, y;
-    int reduced_blank, reduced_blank_v1_2, film_optimized, interlaced;
+    int reduced_blank_ver, film_optimized, interlaced;
     int xf86mode, fbmode;
     float v_freq;
 } options;
@@ -133,7 +131,7 @@ void print_xf86_mode (mode *m);
 void print_fb_mode (mode *m);
 mode *vert_refresh (
     int h_pixels, int v_lines, float freq,
-    int interlaced, int reduced_blank, int margins,
+    int interlaced, int reduced_blank_ver, int margins,
     int film_optimized
 );
 void set_global_timings_v1_2();
@@ -148,7 +146,7 @@ int global_verbose = 0;
 void print_value(int n, char *name, float val)
 {
     if (global_verbose) {
-        printf("%2d: %-27s: %15f\n", n, name, val);
+        printf("%4d: %-25s: %15f\n", n, name, val);
     }
 }
 
@@ -160,13 +158,13 @@ void print_xf86_mode (mode *m)
     printf (
         "# %dx%d @ %.3f Hz %s%s(CVT)"
         " field rate %.3f Hz; hsync: %.3f kHz; pclk: %.2f MHz\n"
-        "Modeline \"%dx%d_%.2f%s%s\"  %.2f"
+        "Modeline \"%dx%d_%.2f%s%s%.0d\"  %.2f"
         "  %d %d %d %d"
         "  %d %d %d %d"
         " %s%chsync %cvsync\n",
         m->hr, m->vr, m->v_freq, (m->in ? "Interlaced " : ""), (m->rb ? "Reduced Blank " : ""),
         m->real_v_rate, m->h_freq, m->pclk,
-        m->hr, m->vr, m->v_freq,  (m->in ? "i" : ""), (m->rb ? "_rb" : ""), m->pclk,
+        m->hr, m->vr, m->v_freq,  (m->in ? "i" : ""), (m->rb ? "_rb" : ""), m->rb, m->pclk,
         m->hr, m->hss, m->hse, m->hfl,
         m->vr, m->vss, m->vse, m->vfl,
         (m->in?"Interlace  ":""), (m->rb?'+':'-'), (m->rb?'-':'+')
@@ -201,7 +199,7 @@ void print_xf86_mode (mode *m)
  *
  * But the fb.modes format is:
  *
- *    <--4--> <--------1--------> <--2--> <--3--> 
+ *    <--4--> <--------1--------> <--2--> <--3-->
  *                                       _________
  *    _______|-------------------|_______|       |
  *
@@ -217,10 +215,10 @@ void print_xf86_mode (mode *m)
 void print_fb_mode (mode *m)
 {
     printf (
-        "\nmode \"%dx%d %.2fHz %s%s32bit (CVT)\"\n"
+        "\nmode \"%dx%d %.2fHz %s%s%.0d%s32bit (CVT)\"\n"
         "    # PCLK: %.2f MHz, H: %.2f kHz, V: %.2f Hz\n"
         "    geometry %d %d %d %d 32\n",
-        m->hr, m->vr, m->v_freq, (m->in ? "INT " : ""), (m->rb ? "RBlank " : ""),
+        m->hr, m->vr, m->v_freq, (m->in ? "INT " : ""), (m->rb ? "RBlank" : ""), (m->rb), (m->rb ? " " : ""),
         m->pclk, m->h_freq, m->real_v_rate,
         m->hr, m->vr, m->hr, m->vr
     );
@@ -255,7 +253,7 @@ void print_fb_mode (mode *m)
  * XXX margin computations are implemented but not tested (nor used by
  * XFree86 of fbset mode descriptions, from what I can tell).
  */
-mode *vert_refresh (int h_pixels, int v_lines, float freq, int interlaced, int reduced_blank, int margins, int film_optimized)
+mode *vert_refresh (int h_pixels, int v_lines, float freq, int interlaced, int reduced_blank_ver, int margins, int film_optimized)
 {
     float h_pixels_rnd, v_lines_rnd;
     float v_field_rate_rqd;
@@ -271,6 +269,7 @@ mode *vert_refresh (int h_pixels, int v_lines, float freq, int interlaced, int r
     float v_sync_rnd, h_sync_rnd;
     float h_back_porch, v_front_porch, h_front_porch;
     float vbi_lines, act_vbi_lines, rb_min_vbi;
+    float pixel_clock_factor;
     float act_pixel_freq, act_h_freq;
     float act_field_rate, act_frame_rate;
     char *aspect_ratio;
@@ -330,6 +329,12 @@ mode *vert_refresh (int h_pixels, int v_lines, float freq, int interlaced, int r
         aspect_ratio = "Custom";
         v_sync = 10;
     }
+
+    // CVT 1.2 Reduced Blanking v2 always uses a v_sync of 8 lines for all aspect ratios
+    if (reduced_blank_ver == 2) {
+        v_sync = 8;
+    }
+
     v_sync_rnd = v_sync;
 
     if (global_verbose) {
@@ -408,7 +413,7 @@ mode *vert_refresh (int h_pixels, int v_lines, float freq, int interlaced, int r
     /*
      *  Here it diverges for "reduced blanking" or normal blanking modes.
      */
-    if (reduced_blank) {
+    if (reduced_blank_ver != 0) {
         h_blank = RB_H_BLANK;
 
         /*  8. Estimate Horiz. Period (us).
@@ -458,20 +463,23 @@ mode *vert_refresh (int h_pixels, int v_lines, float freq, int interlaced, int r
 
         /*  13. Find Pixel Clock Frequency (MHz).
         *
-        *  [Non-rounded PIXEL_FREQ] = V_FIELD_RATE_RQD*TOTAL_V_LINES*TOTAL_PIXELS/1000000
+        *  [Non-rounded PIXEL_FREQ] = V_FIELD_RATE_RQD*TOTAL_V_LINES*TOTAL_PIXELS/1000000* IF(AND((RED_BLANK_RQD?="y"),(RED_BLANK_VER="y"),(VIDEO_OPT="y")),1000/1001,1)
         *  [ACT PIXEL FREQ] = CLOCK_STEP * ROUND((V_FIELD_RATE_RQD*TOTAL_V_LINES*TOTAL_PIXELS/1000000)/CLOCK_STEP,0)
         */
-        act_pixel_freq = v_field_rate_rqd * total_v_lines * total_pixels / 1000000.0;
+        // Set pixel clock adjustment factor to get the vertical refresh rate to match video better.
+        // ie (24 * 1000 / 1001) = 23.976
+        if (film_optimized == 1) {
+            pixel_clock_factor = 1000.0 / 1001.0;
+        } else {
+            pixel_clock_factor = 1.0;
+        }
+
+        act_pixel_freq = v_field_rate_rqd * total_v_lines * total_pixels / 1000000.0 * pixel_clock_factor;
         print_value(13, "[Non-rounded PIXEL FREQ]", act_pixel_freq);
 
         act_pixel_freq = CLOCK_STEP * floor(act_pixel_freq / CLOCK_STEP);
         print_value(13, "[ACT PIXEL FREQ]", act_pixel_freq);
 
-        // Lower pixel clock to get the vertical refresh rate to match video better.
-        // ie (24 * 1000 / 1001) = 23.976
-        if (film_optimized == 1) {
-            act_pixel_freq = (act_pixel_freq * 1000 / 1001);
-        }
 
         stage = 14;
 
@@ -587,7 +595,7 @@ mode *vert_refresh (int h_pixels, int v_lines, float freq, int interlaced, int r
      *
      *  [H SYNC RND] = IF(RED_BLANK_RQD?="Y",RB_H_SYNC,(ROUNDDOWN((H_SYNC_PER/100*TOTAL_PIXELS/CELL_GRAN_RND),0))*CELL_GRAN_RND)
      */
-    if (reduced_blank) {
+    if (reduced_blank_ver != 0) {
         h_sync_rnd = RB_H_SYNC;
     } else {
         h_sync_rnd = floor(H_SYNC_PER/100.0*total_pixels/CELL_GRAN_RND) * CELL_GRAN_RND;
@@ -604,9 +612,15 @@ mode *vert_refresh (int h_pixels, int v_lines, float freq, int interlaced, int r
 
     /*  23. Find Vertical Front Porch.
      *
-     *  [V FRONT PORCH] = IF(RED_BLANK_RQD?="y",RB_V_FPORCH,MIN_V_PORCH_RND)
+     *  [V FRONT PORCH] = IF(RED_BLANK_RQD?="y",IF(RED_BLANK_VER="y", V_BLANK-V_BACK_PORCH-V_SYNC_RND, RB_V_FPORCH), MIN_V_PORCH_RND)
      */
-    v_front_porch = reduced_blank ? RB_V_FPORCH : MIN_V_PORCH_RND;
+    if  (reduced_blank_ver == 1) {
+        v_front_porch = RB_V_FPORCH;
+    } else if (reduced_blank_ver == 2) {
+        v_front_porch = act_vbi_lines - RB_MIN_V_BPORCH - v_sync_rnd;
+    } else {
+        v_front_porch = MIN_V_PORCH_RND;
+    }
     print_value(23, "[V FRONT PORCH]", v_front_porch);
 
     // Finally, pack the results in the mode struct.
@@ -616,7 +630,7 @@ mode *vert_refresh (int h_pixels, int v_lines, float freq, int interlaced, int r
     m->hfl = (int) (total_pixels);
 
     int real_v_lines = v_lines;
-    m->vr  = (int) (real_v_lines);
+    m->vr  = (real_v_lines);
     m->vss = (int) (real_v_lines + v_front_porch);
     m->vse = (int) (real_v_lines + v_front_porch + v_sync_rnd);
     m->vfl = (int) (total_v_lines - v_lines_rnd + real_v_lines);
@@ -627,7 +641,7 @@ mode *vert_refresh (int h_pixels, int v_lines, float freq, int interlaced, int r
     m->real_v_rate = act_field_rate;
 
     m->in = interlaced;
-    m->rb = reduced_blank;
+    m->rb = reduced_blank_ver;
 
     return (m);
 }
@@ -657,7 +671,7 @@ options *parse_command_line (int argc, char *argv[])
         if ((strcmp (argv[n], "-v") == 0) || (strcmp (argv[n], "--verbose") == 0)) {
             global_verbose = 1;
         } else if ((strcmp (argv[n], "-r") == 0) || (strcmp (argv[n], "--reduced-blank") == 0)) {
-            o->reduced_blank = 1;
+            o->reduced_blank_ver = 1;
         } else if ((strcmp (argv[n], "-i") == 0) || (strcmp (argv[n], "--interlaced") == 0)) {
             o->interlaced = 1;
         } else if ((strcmp (argv[n], "-f") == 0) || (strcmp (argv[n], "--fbmode") == 0)) {
@@ -665,7 +679,7 @@ options *parse_command_line (int argc, char *argv[])
         } else if ((strcmp (argv[n], "-x") == 0) ||  (strcmp (argv[n], "--xf86mode") == 0)) {
             o->xf86mode = 1;
         } else if ((strcmp (argv[n], "-b") == 0) ||  (strcmp (argv[n], "--rb-v2") == 0)) {
-            o->reduced_blank_v1_2 = 1;
+            o->reduced_blank_ver = 2;
         } else if ((strcmp (argv[n], "-o") == 0) ||  (strcmp (argv[n], "--film-optimized") == 0)) {
             o->film_optimized = 1;
         } else {
@@ -674,7 +688,7 @@ options *parse_command_line (int argc, char *argv[])
     }
 
     // If CVT 1.1 and using reduced blanking, check if vertical frequency is multiple of 60hz.
-    if (o->reduced_blank == 1) {
+    if (o->reduced_blank_ver == 1) {
         if (o->v_freq > 60.0 && fmodf(o->v_freq, (float)60) != 0) {
             goto bad_vrefresh;
         } else if (o->v_freq < 60.0 && fmodf((float)60, o->v_freq) != 0) {
@@ -682,17 +696,21 @@ options *parse_command_line (int argc, char *argv[])
         }
     }
 
-    // If -b is passed, set -r to true.
-    if (o->reduced_blank_v1_2 == 1) {
-        o->reduced_blank = 1;
-    } else { // Ignore -o if -b is not passed.
-        o->film_optimized = 0;
+    // If -b is not passed, disable -o
+    if (o->reduced_blank_ver != 2) {
+        o-> film_optimized = 0;
     }
 
     // If neither xf86mode nor fbmode were requested, default to xf86mode.
     if (!o->fbmode && !o->xf86mode) {
         o->xf86mode = 1;
     }
+
+    // If neither of the reduced blanking versions were requested, disable it
+    if (!(o->reduced_blank_ver == 1 || o->reduced_blank_ver == 2)) {
+        o->reduced_blank_ver = 0;
+    }
+
     return (o);
 
  bad_vrefresh:
@@ -744,10 +762,10 @@ options *parse_command_line (int argc, char *argv[])
 void set_global_timings_v1_2()
 {
     CLOCK_STEP      =   0.001; // Clock steps in MHz
-    CELL_GRAN       =   1.000; // assumed character cell granularity
     CELL_GRAN_RND   =   1.000; // assumed character cell granularity (round)
-    MIN_V_BPORCH    =   3.000; // width of vsync in lines
-    RB_V_FPORCH     =  23.000; // lines
+    MIN_V_BPORCH    =   6.000; // width of vsync in lines
+    RB_V_FPORCH     =   1.000; // lines
+    RB_H_BLANK      =  80.000; // pixels
 }
 
 int main (int argc, char *argv[])
@@ -760,11 +778,11 @@ int main (int argc, char *argv[])
         exit (1);
     }
 
-    if (o->reduced_blank_v1_2 == 1) {
+    if (o->reduced_blank_ver == 2) {
         set_global_timings_v1_2();
     }
 
-    m = vert_refresh (o->x, o->y, o->v_freq, o->interlaced, o->reduced_blank, 0, o->film_optimized);
+    m = vert_refresh (o->x, o->y, o->v_freq, o->interlaced, o->reduced_blank_ver, 0, o->film_optimized);
     if (!m) {
         exit (2);
     }
