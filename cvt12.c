@@ -120,7 +120,7 @@ typedef struct __mode {
 
 typedef struct __options {
     int x, y;
-    int reduced_blank_ver, film_optimized, interlaced;
+    int reduced_blank_ver, film_optimized, interlaced, force_reduced_blank;
     int xf86mode, fbmode;
     float v_freq;
 } options;
@@ -667,6 +667,7 @@ options *parse_command_line (int argc, char *argv[])
         goto bad_option;
     }
 
+    o->force_reduced_blank = 0;
     while (++n < argc) {
         if ((strcmp (argv[n], "-v") == 0) || (strcmp (argv[n], "--verbose") == 0)) {
             global_verbose = 1;
@@ -682,6 +683,9 @@ options *parse_command_line (int argc, char *argv[])
             o->reduced_blank_ver = 2;
         } else if ((strcmp (argv[n], "-o") == 0) ||  (strcmp (argv[n], "--film-optimized") == 0)) {
             o->film_optimized = 1;
+        } else if ((strcmp (argv[n], "-c") == 0) || (strcmp (argv[n], "--force-rb") == 0)) {
+            o->reduced_blank_ver = 1;
+            o->force_reduced_blank = 1;
         } else {
             goto bad_option;
         }
@@ -689,7 +693,13 @@ options *parse_command_line (int argc, char *argv[])
 
     // If CVT 1.1 and using reduced blanking, check if vertical frequency is multiple of 60hz.
     if (o->reduced_blank_ver == 1) {
-        if (o->v_freq > 60.0 && fmodf(o->v_freq, (float)60) != 0) {
+        if (o->force_reduced_blank) {
+            fprintf(
+                stderr,
+                "WARNING: Refresh rate must be multiple of 60hz according to CVT 1.1 specifications for reduced blanking.\n"
+                "WARNING: Forcing calculations might give incorrect results. Use at your own risk.\n\n"
+            );
+        } else if (o->v_freq > 60.0 && fmodf(o->v_freq, (float)60) != 0) {
             goto bad_vrefresh;
         } else if (o->v_freq < 60.0 && fmodf((float)60, o->v_freq) != 0) {
             goto bad_vrefresh;
@@ -739,6 +749,8 @@ options *parse_command_line (int argc, char *argv[])
         " -v|--verbose        : Enable verbose printouts (traces each step of the computation).\n"
         " -r|--reduced-blank  : Use CVT 1.1 \"Reduced Blanking\" timings\n"
         "                       Only allows multiple of 60hz.\n"
+        " -c|--force-rb       : Force CVT 1.1 \"Reduced Blanking\" timings\n"
+        "                       Do not check for multiple of 60hz.\n"
         " -b|--rb-v2          : Use CVT 1.2 \"Reduced Blanking\" timings, this is more precise.\n"
         "                       Allows any refresh rate.\n"
         " -o|--film-optimized : Change refresh rate for better video support. Requires -b\n"
