@@ -268,7 +268,7 @@ mode *vert_refresh (int h_pixels, int v_lines, float freq, int interlaced, int r
     float total_pixels, total_v_lines;
     float v_sync_rnd, h_sync_rnd;
     float h_back_porch, v_front_porch, h_front_porch;
-    float vbi_lines, act_vbi_lines, rb_min_vbi;
+    float act_vbi_lines = 0, vbi_lines, rb_min_vbi;
     float pixel_clock_factor;
     float act_pixel_freq, act_h_freq;
     float act_field_rate, act_frame_rate;
